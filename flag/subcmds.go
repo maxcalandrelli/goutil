@@ -1,3 +1,6 @@
+// Keyword arguments can open sub-grammars
+// having their own flags and/or keywords, that in turn can open
+// other subgrammars
 package gu_flag
 
 import (
@@ -9,6 +12,7 @@ import (
 )
 
 type (
+	// FlagSet represents the subgrammar introduced by a given keyword
 	FlagSet struct {
 		subCommand     string
 		usage          string
@@ -103,6 +107,7 @@ func (f *FlagSet) NewFlagSet(name, usage string) *FlagSet {
 		r.parent = &MainSet
 	}
 	r.parent.subSets[name] = r
+	r.HookFunc = func(*FlagSet) error { return nil }
 	return r
 }
 

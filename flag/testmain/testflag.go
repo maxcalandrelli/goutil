@@ -17,6 +17,9 @@ var (
 		opt_a_f2  string
 		opt_b_f1  string
 		opt_b1_f1 int
+		opt_b1_l1 []string
+		opt_b1_l2 []string
+		opt_b1_l3 []string
 	}
 )
 
@@ -43,14 +46,22 @@ func main() {
 	bopts.Flags.StringVar(&cmdopts.opt_b_f1, "style", "unknown", "hat style")
 	b1opts := bopts.NewFlagSet("color", "set hat color")
 	b1opts.Flags.IntVar(&cmdopts.opt_b1_f1, "index", -1, "color index")
+	b1opts.ListVar(&cmdopts.opt_b1_l1, "shade", []string{"dark", "light"}, "color shades")
+	b1opts.SetVar(&cmdopts.opt_b1_l2, "leather", []string{}, "animal kind", true)
+	b1opts.ConstrainedSetVar(&cmdopts.opt_b1_l3, "heels", []string{"?"}, []string{"high", "veryhigh", "extreme"}, "coolness", true)
 	gu_flag.MainSet.Flags.Init("", flag.ContinueOnError)
-	test("-bah")
-	test("-how=notsohard shoes -size=33")
-	test("-how=notsohard shoe -size=33")
-	test("-how=notsohard shoes -size=33 --typ=comfort")
-	test("-how=notsohard shoes -size=33 --type=comfort")
-	test("hat")
-	test("hat --style=classic")
-	test("hat -style=havana color -index=4")
+	/*
+		test("-bah")
+		test("-how=notsohard shoes -size=33")
+		test("-how=notsohard shoe -size=33")
+		test("-how=notsohard shoes -size=33 --typ=comfort")
+		test("-how=notsohard shoes -size=33 --type=comfort")
+		test("hat")
+		test("hat --style=classic")
+		test("hat -style=havana color -index=4")
+	*/
 	testargs(os.Args[1:])
+	fmt.Printf("shades: %v\n", cmdopts.opt_b1_l1)
+	fmt.Printf("leather: %v\n", cmdopts.opt_b1_l2)
+	fmt.Printf("heels: %v\n", cmdopts.opt_b1_l3)
 }
