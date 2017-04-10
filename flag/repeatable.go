@@ -10,7 +10,7 @@ import (
 
 var (
 	DUPLICATE_VALUE error = errors.New("value already present")
-	NOT_IN_SET      error = errors.New("value <%s> out of set")
+	NOT_IN_SET      error = errors.New("value out of set")
 )
 
 type RepeatableArg interface {
@@ -188,7 +188,7 @@ func (f *FlagSet) ConstrainedSetVar(p *[]string, name string, value []string, al
 		if _, _valid := validMap[v]; _valid {
 			return _i(v)
 		}
-		return errors.New(fmt.Sprintf(NOT_IN_SET.Error(), v))
+		return NOT_IN_SET
 	})
 	return sa
 }
