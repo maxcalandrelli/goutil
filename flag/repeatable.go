@@ -15,7 +15,7 @@ var (
 
 type RepeatableArg interface {
 	GetSeparator() string
-	setSeparator(string)
+	SetSeparator(string)
 	IsDefault() bool
 	setDefault(bool)
 	getCanonicalizer() func(string) string
@@ -52,7 +52,7 @@ func (losa *listOrSetArg) GetSeparator() string {
 	return losa.separator
 }
 
-func (losa *listOrSetArg) setSeparator(s string) {
+func (losa *listOrSetArg) SetSeparator(s string) {
 	losa.separator = s
 }
 
