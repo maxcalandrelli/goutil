@@ -17,6 +17,13 @@ const (
 
 type LogLevel uint
 
+var (
+	NIL_LOGGER Logger = &nil_logger{}
+	STD_LOGGER Logger = StdLogger()
+
+	DebugLog Logger = NIL_LOGGER
+)
+
 func (l *LogLevel) Set(value string) error {
 	s := strings.ToLower(value)
 	switch s {
@@ -109,3 +116,9 @@ func StdLogger() Logger {
 func CustomLogger(logger *log.Logger) Logger {
 	return &std_logger_wrapper{logger: logger, level: LOG_INFO}
 }
+
+type nil_logger struct {
+	std_logger_wrapper
+}
+
+func (l *nil_logger) Custom(level LogLevel, msg string) {}

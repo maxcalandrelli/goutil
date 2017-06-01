@@ -62,7 +62,7 @@ func (f *FlagSet) Usage() string {
 func (f *FlagSet) Parse(args []string) error {
 	if ForceEqualAlways {
 		flags := []string{}
-		for len(args) > 0 && args[0][0] == '-' {
+		for len(args) > 0 && len(args[0]) > 0 && args[0][0] == '-' {
 			flags = append(flags, args[0])
 			args = args[1:]
 		}
@@ -103,10 +103,10 @@ func (f *FlagSet) NewFlagSet(name, usage string) *FlagSet {
 	r.usage = usage
 	r.Flags = flag.NewFlagSet(name, flag.ContinueOnError)
 	r.parent = f
-	if r.parent == nil {
+	if r.parent == nil && len(name) != 0 {
 		r.parent = &MainSet
+		r.parent.subSets[name] = r
 	}
-	r.parent.subSets[name] = r
 	r.HookFunc = func(*FlagSet) error { return nil }
 	return r
 }
