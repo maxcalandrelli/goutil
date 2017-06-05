@@ -22,8 +22,9 @@ type ThrottledQuantity interface {
 	GetThrottleType() ThrottleType
 	Update(increment float64)
 	GetLastIncrement() float64
-	SetUnits(name string, rateUnits float64, timeUnits time.Duration)
+	SetUnits(name, speedName string, valueUnits float64, timeUnits time.Duration)
 	GetUnitsName() string
+	GetSpeedUnitsName() string
 	GetInstantRate() float64
 	GetAverageRate() float64
 }

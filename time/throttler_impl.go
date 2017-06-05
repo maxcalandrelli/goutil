@@ -18,16 +18,17 @@ type throttledQuantity struct {
 	name          string
 	maxRate       float64
 	currentValue  float64
-	rateUnits     float64
+	valueUnits    float64
 	timeUnits     time.Duration
 	mode          ThrottleType
 	lastIncrement float64
 	unitsName     string
+	speedName     string
 	lastUpdate    time.Time
 }
 
 func (tq throttledQuantity) Name() string {
-	return tq.name
+	return tq.throttler.Name() + ":" + tq.name
 }
 
 func (tq throttledQuantity) GetThrottler() Throttler {
@@ -43,7 +44,7 @@ func (tq throttledQuantity) GetThrottleType() ThrottleType {
 }
 
 func (tq throttledQuantity) GetUnits() float64 {
-	return tq.rateUnits
+	return tq.valueUnits
 }
 
 func (tq throttledQuantity) GetTimeUnits() time.Duration {
@@ -51,8 +52,22 @@ func (tq throttledQuantity) GetTimeUnits() time.Duration {
 }
 
 func (tq *throttledQuantity) Update(increment float64) {
-	tq.lastIncrement = increment
+	gu_log.DebugLog.Custom(
+		gu_log.LOG_DEBUG+7,
+		fmt.Sprintf("Update of %s cv=%f li=%f i=%f nv=%f",
+			tq.Name(),
+			tq.currentValue,
+			tq.lastIncrement,
+			increment,
+			tq.currentValue+tq.lastIncrement+increment,
+		))
+	tq.lastIncrement += increment
 	tq.lastUpdate = time.Now()
+	if pt := tq.throttler.Parent(); pt != nil {
+		if ptq := pt.GetThrottledQuantity(tq.name); ptq != nil {
+			ptq.Update(increment)
+		}
+	}
 }
 
 func (tq throttledQuantity) GetValue() float64 {
@@ -84,9 +99,14 @@ func (tq throttledQuantity) GetUnitsName() string {
 	return tq.unitsName
 }
 
-func (tq *throttledQuantity) SetUnits(name string, rateUnits float64, timeUnits time.Duration) {
+func (tq throttledQuantity) GetSpeedUnitsName() string {
+	return tq.speedName
+}
+
+func (tq *throttledQuantity) SetUnits(name, speedName string, valueUnits float64, timeUnits time.Duration) {
 	tq.unitsName = name
-	tq.rateUnits = rateUnits
+	tq.speedName = speedName
+	tq.valueUnits = valueUnits
 	tq.timeUnits = timeUnits
 }
 
@@ -115,6 +135,7 @@ func (tqp throttledQuantityPause) ActualRate() float64 {
 
 func (tqp *throttledQuantityPause) Wait() {
 	if tqp.qty != nil {
+		gu_log.DebugLog.Custom(gu_log.LOG_DEBUG+5, fmt.Sprintf("sleeping %v on %s", tqp.amount, tqp.qty.Name()))
 		t := tqp.qty.GetThrottler()
 		t.Pause(tqp.amount)
 		tqp.amount = time.Duration(0)
@@ -163,7 +184,7 @@ func (t *throttler) SetDutyCycle(rate float64) {
 	t.checkCallable("SetDutyCycle", true, false)
 	if t.timeQty == nil {
 		t.timeQty = t.DefineThrottledQuantity("DutyCycle", rate, ThrottleAverageValue)
-		t.timeQty.SetUnits("duty", 1.0, time.Duration(1))
+		t.timeQty.SetUnits("time", "duty", 1.0, time.Duration(1))
 	} else {
 		t.timeQty.(*throttledQuantity).maxRate = rate
 	}
@@ -178,18 +199,21 @@ func (t *throttler) GetDutyCycle() float64 {
 
 func (t *throttler) checkCallable(opname string, mustBeStopped, mustBeStarted bool) {
 	if t.IsFrozen() {
-		panic(opname + "() called on frozen throttler")
+		panic(opname + "() called on frozen throttler " + t.name)
 	}
 	if mustBeStopped && t.IsOperationInProgress() {
-		panic(opname + "() called on started throttler")
+		panic(opname + "() called on started throttler " + t.name)
 	}
 	if mustBeStarted && !t.IsOperationInProgress() {
-		panic(opname + "() called on stopped throttler")
+		panic(opname + "() called on stopped throttler " + t.name)
 	}
 }
 
 func (t throttler) Name() string {
-	return t.name
+	if t.parent == nil {
+		return "[" + t.name + "]"
+	}
+	return t.parent.Name() + "[" + t.name + "]"
 }
 
 func (t *throttler) DefineThrottledQuantity(name string, rate float64, throttleType ThrottleType) ThrottledQuantity {
@@ -203,7 +227,7 @@ func (t *throttler) DefineThrottledQuantity(name string, rate float64, throttleT
 			maxRate:      rate,
 			currentValue: 0.0,
 			mode:         throttleType,
-			rateUnits:    1.0,
+			valueUnits:   1.0,
 			timeUnits:    time.Duration(1),
 			unitsName:    "",
 		}
@@ -269,7 +293,7 @@ func updatePause(tq ThrottledQuantity, currentValue float64, interval time.Durat
 				interval,
 				currentRate,
 				maximumRate,
-				tq.GetUnitsName(),
+				tq.GetSpeedUnitsName(),
 				next_minWait,
 			))
 	}
@@ -283,6 +307,7 @@ func (t *throttler) StartOperation() {
 	for _, tq := range t.quantities {
 		tq.(*throttledQuantity).lastIncrement = 0.0
 	}
+	t.lock.Unlock()
 }
 
 func (t *throttler) getPause() ThrottlingPause {
@@ -293,24 +318,23 @@ func (t *throttler) getPause() ThrottlingPause {
 	if t.timeQty != nil {
 		tm := t.timeQty.(*throttledQuantity)
 		tm.lastIncrement = float64(now.Sub(t.last_throttling))
-		tm.currentValue = float64(now.Sub(t.first_started) - t.totalWait)
+		tm.currentValue = float64(total_lapse-t.totalWait) - tm.lastIncrement
 	}
 	for _, qty := range t.quantities {
 		tq := qty.(*throttledQuantity)
-		tq.currentValue += tq.lastIncrement
 		switch tq.GetThrottleType() {
 		case ThrottleAverageValue:
-			updatePause(tq, tq.currentValue, total_lapse, false, &pause)
+			updatePause(tq, tq.currentValue+tq.lastIncrement, total_lapse, false, &pause)
 		case ThrottleInstantValue:
 			updatePause(tq, tq.lastIncrement, t.lastLapse, true, &pause)
 		case ThrottleBoth:
 			updatePause(tq, tq.lastIncrement, t.lastLapse, true, &pause)
-			updatePause(tq, tq.currentValue, total_lapse, false, &pause)
+			updatePause(tq, tq.currentValue+tq.lastIncrement, total_lapse, false, &pause)
 		}
 	}
 	t.sendCallback(&pause)
 	if pause.Qty() != nil {
-		gu_log.DebugLog.Custom(gu_log.LOG_DEBUG+7, fmt.Sprintf("throttling on %s for %v, reason: %srate=%f>%f %s",
+		gu_log.DebugLog.Custom(gu_log.LOG_DEBUG+7, fmt.Sprintf("throttling needed on %s for %v, reason: %srate=%f>%f %s",
 			pause.Qty().Name(),
 			pause.Amount(),
 			map[bool]string{false: "", true: "instant "}[pause.Reason() != ThrottleAverageValue],
@@ -325,6 +349,7 @@ func (t *throttler) getPause() ThrottlingPause {
 func (t *throttler) StopOperation() ThrottlingPause {
 	t.checkCallable("StopOperation", false, true)
 	pause := t.getPause()
+	t.lock.Lock()
 	t.currently_started = time.Time{}
 	t.last_throttling = time.Time{}
 	t.lock.Unlock()
@@ -335,6 +360,14 @@ func (t *throttler) Throttle() {
 	t.checkCallable("Throttle", false, true)
 	t.getPause().Wait()
 	t.last_throttling = time.Now()
+	for _, qty := range t.quantities {
+		tq := qty.(*throttledQuantity)
+		tq.currentValue += tq.lastIncrement
+		tq.lastIncrement = 0
+	}
+	if tp := t.Parent(); tp != nil {
+		tp.Throttle()
+	}
 }
 
 func (t *throttler) Freeze() {
@@ -369,8 +402,10 @@ func (t *global_throttler) Pause(duration time.Duration) {
 }
 
 func (t *throttler) Pause(duration time.Duration) {
+	t.lock.Lock()
 	t.parent.Pause(duration)
 	t.totalWait += duration
+	t.lock.Unlock()
 }
 
 func (parent *throttler) NewThrottler(name string) Throttler {
@@ -398,7 +433,9 @@ func newThrottler(name string, parent Throttler) *throttler {
 }
 
 func globalThrottler() Throttler {
-	return &global_throttler{
+	g := &global_throttler{
 		throttler: *newThrottler("GLOBALTHROTTLER", nil),
 	}
+	g.StartOperation()
+	return g
 }
