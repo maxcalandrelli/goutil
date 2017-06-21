@@ -21,6 +21,7 @@ type (
 		parent         *FlagSet
 		NonKeywordArgs bool
 		HookFunc       func(self *FlagSet) error
+		args           []string
 	}
 )
 
@@ -28,6 +29,14 @@ var (
 	ForceEqualAlways         = true
 	MainSet          FlagSet = FlagSet{Flags: flag.CommandLine, subSets: map[string]*FlagSet{}}
 )
+
+func (f *FlagSet) Args() []string {
+	return f.args
+}
+
+func (f *FlagSet) NArg() int {
+	return len(f.args)
+}
 
 func (f *FlagSet) PrintDefaults() {
 	if f.parent != nil {
@@ -77,6 +86,7 @@ func (f *FlagSet) Parse(args []string) error {
 		}
 		args = f.Flags.Args()
 	}
+	f.args = args
 	switch {
 	case len(args) == 0 && len(f.subSets) == 0:
 		return f.HookFunc(f)
@@ -105,8 +115,8 @@ func (f *FlagSet) NewFlagSet(name, usage string) *FlagSet {
 	r.parent = f
 	if r.parent == nil && len(name) != 0 {
 		r.parent = &MainSet
-		r.parent.subSets[name] = r
 	}
+	r.parent.subSets[name] = r
 	r.HookFunc = func(*FlagSet) error { return nil }
 	return r
 }
