@@ -1,6 +1,7 @@
 package gu_io
 
 import (
+	"errors"
 	"io"
 	"time"
 
@@ -27,6 +28,18 @@ func (th *throttledReader) Read(p []byte) (n int, err error) {
 		if pause.Amount() > time.Duration(0) {
 			pause.Wait()
 		}
+	}
+	return
+}
+
+func (th *throttledReader) ReadAt(p []byte, offs int64) (n int, err error) {
+	n = 0
+	if ra, ok := th.underlying_reader.(io.Seeker); ok {
+		if _, err = ra.Seek(offs, io.SeekStart); err == nil {
+			n, err = th.Read(p)
+		}
+	} else {
+		return 0, errors.New("reader is not a ReaderAt")
 	}
 	return
 }
