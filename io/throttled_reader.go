@@ -1,6 +1,7 @@
 package gu_io
 
 import (
+	"errors"
 	"io"
 	"time"
 
@@ -29,6 +30,17 @@ func (th *throttledReader) Read(p []byte) (n int, err error) {
 		}
 	}
 	return
+}
+
+func (th *throttledReader) ReadAt(p []byte, offs int64) (n int, err error) {
+	if ra, ok := th.underlying_reader.(io.ReaderAt); ok {
+		if _, err := ra.ReadAt([]byte{}, offs); err != nil {
+			return 0, err
+		}
+		return th.underlying_reader.Read(p)
+	} else {
+		return 0, errors.New("ReadAt not implemented")
+	}
 }
 
 func NewThrottledReader(rdr io.Reader, limit gu_time.ThrottledQuantity) io.Reader {

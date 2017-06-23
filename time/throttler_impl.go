@@ -169,11 +169,13 @@ func (t *throttler) sendCallback(pause ThrottlingPause) {
 	if t.callback != nil {
 		t.callback(pause)
 	}
-	switch t.parent.(type) {
-	case *throttler:
-		t.parent.(*throttler).sendCallback(pause)
-	case *global_throttler:
-		t.parent.(*global_throttler).sendCallback(pause)
+	if t.parent != nil {
+		switch t.parent.(type) {
+		case *throttler:
+			t.parent.(*throttler).sendCallback(pause)
+		case *global_throttler:
+			t.parent.(*global_throttler).sendCallback(pause)
+		}
 	}
 }
 
