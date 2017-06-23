@@ -116,7 +116,9 @@ func (f *FlagSet) NewFlagSet(name, usage string) *FlagSet {
 	if r.parent == nil && len(name) != 0 {
 		r.parent = &MainSet
 	}
-	r.parent.subSets[name] = r
+	if r.parent != nil {
+		r.parent.subSets[name] = r
+	}
 	r.HookFunc = func(*FlagSet) error { return nil }
 	return r
 }
