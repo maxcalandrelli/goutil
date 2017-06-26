@@ -7,6 +7,11 @@ import (
 	"fmt"
 
 	"golang.org/x/sys/windows/svc/debug"
+	"golang.org/x/sys/windows/svc/eventlog"
+)
+
+var (
+	DEFAULT_MSGID = uint32(1)
 )
 
 type win_logger_wrapper struct {
@@ -68,5 +73,17 @@ func (l win_logger_wrapper) Error(msg string, args ...interface{}) {
 }
 
 func GetWindowsEventLogger(logger debug.Log) Logger {
-	return &win_logger_wrapper{logger: logger, level: LOG_INFO, msgid: 0}
+	return &win_logger_wrapper{logger: logger, level: LOG_INFO, msgid: DEFAULT_MSGID}
+}
+
+func InstallWindowsLogSource(name string) error {
+	return eventlog.InstallAsEventCreate(name, eventlog.Error|eventlog.Warning|eventlog.Info)
+}
+
+func GetWindowsEventLoggerForSource(name string) (Logger, error) {
+	elog, err := eventlog.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return GetWindowsEventLogger(elog), nil
 }
