@@ -38,7 +38,7 @@ type listOrSetArg struct {
 
 type setArg struct {
 	listOrSetArg
-	values map[string]bool
+	values_present map[string]bool
 }
 
 func (losa *listOrSetArg) String() string {
@@ -84,6 +84,21 @@ func (losa *listOrSetArg) Get() interface{} {
 	return losa.GetValues()
 }
 
+func toString(m map[string]bool) string {
+	r := []string{}
+	for k, v := range m {
+		r = append(r, fmt.Sprintf("%s=%v", k, v))
+	}
+	return strings.Join(r, ",")
+}
+
+func (sa *setArg) Set(v string) error {
+	if sa.IsDefault() {
+		sa.values_present = map[string]bool{}
+	}
+	return sa.listOrSetArg.Set(v)
+}
+
 func (losa *listOrSetArg) Set(v string) error {
 	if losa.IsDefault() {
 		losa.reset()
@@ -116,14 +131,14 @@ func newListArg(values *[]string, separator string, default_value []string, cano
 		inserter:      inserter,
 	}
 	for _, _v := range default_value {
-		la.Set(_v)
+		la.getInserter()(_v)
 	}
 	la.setDefault(true)
 	return &la
 }
 
 func (sa *setArg) reset() {
-	sa.values = map[string]bool{}
+	sa.values_present = map[string]bool{}
 	sa.listOrSetArg.reset()
 }
 
@@ -142,29 +157,27 @@ func (f *FlagSet) Set(name string, value []string, usage string, ignoreCase bool
 }
 
 func (f *FlagSet) SetVar(p *[]string, name string, value []string, usage string, ignoreCase bool) RepeatableArg {
-	vmap := map[string]bool{}
-	sa := setArg{
-		values: vmap,
-		listOrSetArg: *newListArg(
-			p,
-			",",
-			value,
-			func(v string) string {
-				if ignoreCase {
-					return strings.ToLower(v)
-				}
-				return v
-			},
-			func(v string) error {
-				if _, _present := vmap[v]; _present {
-					return DUPLICATE_VALUE
-				}
-				vmap[v] = true
-				*p = append(*p, v)
-				return nil
-			},
-		),
-	}
+	sa := setArg{}
+	sa.values_present = map[string]bool{}
+	sa.listOrSetArg = *newListArg(
+		p,
+		",",
+		value,
+		func(v string) string {
+			if ignoreCase {
+				return strings.ToLower(v)
+			}
+			return v
+		},
+		func(v string) error {
+			if _, _present := sa.values_present[v]; _present {
+				return DUPLICATE_VALUE
+			}
+			sa.values_present[v] = true
+			*p = append(*p, v)
+			return nil
+		},
+	)
 	for _, _v := range value {
 		sa.Set(_v)
 	}
