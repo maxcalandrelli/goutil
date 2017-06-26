@@ -33,14 +33,15 @@ func (th *throttledReader) Read(p []byte) (n int, err error) {
 }
 
 func (th *throttledReader) ReadAt(p []byte, offs int64) (n int, err error) {
-	if ra, ok := th.underlying_reader.(io.ReaderAt); ok {
-		if _, err := ra.ReadAt([]byte{}, offs); err != nil {
-			return 0, err
+	n = 0
+	if ra, ok := th.underlying_reader.(io.Seeker); ok {
+		if _, err = ra.Seek(offs, io.SeekStart); err == nil {
+			n, err = th.Read(p)
 		}
-		return th.underlying_reader.Read(p)
 	} else {
-		return 0, errors.New("ReadAt not implemented")
+		return 0, errors.New("reader is not a ReaderAt")
 	}
+	return
 }
 
 func NewThrottledReader(rdr io.Reader, limit gu_time.ThrottledQuantity) io.Reader {
