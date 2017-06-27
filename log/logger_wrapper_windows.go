@@ -45,7 +45,7 @@ func (l win_logger_wrapper) Custom(level LogLevel, msg string, args ...interface
 		case LOG_INFO:
 			l.logger.Info(l.msgid, m)
 		default:
-			l.logger.Info(l.msgid, fmt.Sprintf("[%s] %s", level.LogString(), m))
+			l.logger.Info(l.msgid, fmt.Sprintf("[%s]\n%s", level.LogString(), m))
 		}
 	}
 }
