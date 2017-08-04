@@ -44,7 +44,7 @@ func (l *std_logger_wrapper) Custom(level LogLevel, msg string, args ...interfac
 		if l.msgid > 0 {
 			l.logger.Printf("[%s:%07d] %s\n", level.LogString(), l.msgid, m)
 		} else {
-			l.logger.Printf("[%s:%07d] %s\n", level.LogString(), m)
+			l.logger.Printf("[%s:nomsgid] %s\n", level.LogString(), m)
 		}
 	}
 }

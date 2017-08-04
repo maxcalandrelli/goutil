@@ -21,3 +21,7 @@ func (s *Sequenced) ReadWrite(action func()) {
 	defer sm.Unlock()
 	action()
 }
+
+func (s *Sequenced) RWMutex() *sync.RWMutex {
+	return (*sync.RWMutex)(s)
+}
